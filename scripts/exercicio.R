@@ -1,9 +1,11 @@
 
-#sumario da base
-summary(iris)
+#criando um vetor simples
+vetor_frutas <- c("maca", "banana","laranja")
+vetor_frutas
 
-#plots da base
-plot(iris)
+#objeto complexo
+laHomes <- lm(price ~ bed, LAhomes)
+laHomes
 
-#estrutura da base
-str(iris)
+#verificando a complexidade
+str(laHomes)
