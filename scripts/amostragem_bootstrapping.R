@@ -16,7 +16,7 @@ bootsDistNormal10 <- replicate(10, sample(simulaDistNormal, 10, replace = TRUE))
 bootsDistNormal10
 
 # calculando uma estatística com bootstrapping (10 amostras)
-medianaBootsNormal10 <- replicate(10, median(sample(simulaDistNormal, 10, replace = TRUE))) # calculando a média de 10 amostras de 10 casos
+medianaBootsNormal10 <- replicate(10, median(sample(simulaDistNormal, 10, replace = TRUE))) # calculando a mediana de 10 amostras de 10 casos
 medianaBootsNormal10
 
 # calculando a mediana de 60 amostras de 10 casos
