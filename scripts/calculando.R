@@ -18,3 +18,14 @@ binomialnegSimulaCentral
 
 hist(binomialnegSimula)
 hist(binomialnegSimulaCentral)
+
+
+
+#Centralizando uma base nativa do R - The Effect of Vitamin C on Tooth Growth in Guinea Pigs
+ToothGrowth[,1]
+hist(ToothGrowth[,1])
+ToothGrowthCentral <- ToothGrowth[,1] - mean(ToothGrowth[,1]) 
+hist(ToothGrowthCentral)
+
+
+
