@@ -60,5 +60,5 @@ melhor_modelo
 
 summary(melhor_modelo)
 
-predVals <- extractPrediction(list(salarios_RPART), testX = teste_salarios[, c(3, 4, 7, 8)], testY = teste_salarios$salary) 
+predVals <- extractPrediction(list(salarios_RF), testX = teste_salarios[, c(3, 4, 7, 8)], testY = teste_salarios$salary) 
 plotObsVsPred(predVals)
