@@ -30,6 +30,7 @@ train.control <- trainControl(method = "cv", number = 10, verboseIter = T) # con
 
 # Treinamentos
 ## Regressão Linear
+
 salarios_LM <- train(salary ~ yrs.since.phd + yrs.service + Female + Male, data = treino_salarios, method = "lm", trControl = train.control)
 summary(salarios_LM) # sumário do modelo linear
 
@@ -54,12 +55,10 @@ plot(salarios_ADA) # evolução do modelo
 print(salarios_ADA) # modelo
 summary(salarios_ADA) # sumário
 
-
 melhor_modelo <- resamples(list(LM = salarios_LM, RF = salarios_RF, RPART = salarios_RPART,  ADABOOST = salarios_ADA))
 melhor_modelo
 
 summary(melhor_modelo)
-
 
 predVals <- extractPrediction(list(salarios_RPART), testX = teste_salarios[, c(3, 4, 7, 8)], testY = teste_salarios$salary) 
 plotObsVsPred(predVals)
