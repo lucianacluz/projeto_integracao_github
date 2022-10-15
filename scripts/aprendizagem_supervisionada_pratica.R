@@ -25,28 +25,36 @@ teste_salarios = salarios[-particao_salarios, ] # - treino = teste
 
 # Validação Cruzada: Pré-processamento
 # Controle de treinamento
-
 train.control <- trainControl(method = "cv", number = 10, verboseIter = T) # controle de treino
 
-# Treinamentos
+# Treinamentos:
 ## Regressão Linear
-
 salarios_LM <- train(salary ~ yrs.since.phd + yrs.service + Female + Male, data = treino_salarios, method = "lm", trControl = train.control)
 summary(salarios_LM) # sumário do modelo linear
 
 ## Árvore de Decisão
 salarios_RPART <- train(salary ~ yrs.since.phd + yrs.service + Female + Male, data = treino_salarios, method = "rpart", trControl = train.control)
-
 summary(salarios_RPART)
 fancyRpartPlot(salarios_RPART$finalModel) # desenho da árvore
 plot(varImp(salarios_RPART)) # importância das variáveis
 
 # Bagging com Floresta Aleatória
-salarios_RF <- train(salary ~ yrs.since.phd + yrs.service + Female + Male, data = treino_salarios, method = "cforest", trControl = train.control)
+# salarios_RF <- train(salary ~ yrs.since.phd + yrs.service + Female + Male, data = treino_salarios, method = "cforest", trControl = train.control)
+# plot(salarios_RF) # evolução do modelo
+# varImp(salarios_RF, scale = T) # importância de cada variável
+# plot(varImp(salarios_RF, scale = T)) # plot de importância
 
-plot(salarios_RF) # evolução do modelo
-varImp(salarios_RF, scale = T) # importância de cada variável
-plot(varImp(salarios_RF, scale = T)) # plot de importância
+#sugestao Hugo
+# hist(salarios$yrs.since.phd)
+# hist(salarios$yrs.service)
+# hist(salarios$Male)
+# hist(salarios$Female)
+# hist(salarios$salary)
+
+
+#TESTE HUGO
+salarios_KNN <- train(salary ~ yrs.since.phd + yrs.service + Female + Male, data = treino_salarios, method = "knn", trControl = train.control)
+summary(salarios_LM) # sumário do modelo de vizinhança
 
 # Boosting com Boosted Generalized Linear Model
 salarios_ADA <- train(salary ~ yrs.since.phd + yrs.service + Female + Male, data = treino_salarios, method = "glmboost", trControl = train.control)
@@ -55,10 +63,11 @@ plot(salarios_ADA) # evolução do modelo
 print(salarios_ADA) # modelo
 summary(salarios_ADA) # sumário
 
-melhor_modelo <- resamples(list(LM = salarios_LM, RF = salarios_RF, RPART = salarios_RPART,  ADABOOST = salarios_ADA))
+melhor_modelo <- resamples(list(LM = salarios_LM, KNN = salarios_KNN, RPART = salarios_RPART,  ADABOOST = salarios_ADA))
 melhor_modelo
 
 summary(melhor_modelo)
 
-predVals <- extractPrediction(list(salarios_RF), testX = teste_salarios[, c(3, 4, 7, 8)], testY = teste_salarios$salary) 
+predVals <- extractPrediction(list(salarios_KNN), testX = teste_salarios[, c(3, 4, 7, 8)], testY = teste_salarios$salary) 
 plotObsVsPred(predVals)
+
