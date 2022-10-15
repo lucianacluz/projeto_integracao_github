@@ -1,28 +1,28 @@
-﻿CD_GEOCODU,Estado,N_mulheres,regiao,Total_deputados_eleitos,fracao,porcentagem_eleitas
-11,Rondônia,3,Norte,8,0,38,38
-12,Acre,4,Norte,8,0,50,50
-13,Amazonas,0,Norte,8,0,00,0
-14,Roraima,2,Norte,8,0,25,25
-15,Pará,1,Norte,17,0,06,6
-16,Amapá,3,Norte,8,0,38,38
-17,Tocantins,2,Norte,8,0,25,25
-21,Maranhão,0,Nordeste,18,0,00,0
-22,Piauí,4,Nordeste,10,0,40,40
-23,Ceará,1,Nordeste,22,0,05,5
-24,Rio Grande do Norte,1,Nordeste,8,0,13,13
-25,Paraíba,1,Nordeste,12,0,08,8
-26,Pernambuco,1,Nordeste,25,0,04,4
-27,Alagoas,1,Nordeste,9,0,11,11
-28,Sergipe,0,Nordeste,8,0,00,0
-29,Bahia,3,Nordeste,39,0,08,8
-31,Minas Gerais,4,Sudeste,53,0,08,8
-32,Espírito Santo,3,Sudeste,10,0,30,30
-33,Rio de Janeiro,10,Sudeste,46,0,22,22
-35,São Paulo,11,Sudeste,70,0,16,16
-41,Paraná,5,Sul,30,0,17,17
-42,Santa Catarina,4,Sul,16,0,25,25
-43,Rio Grande do Sul,3,Sul,31,0,10,10
-50,Mato Grosso do Sul,2,Centro-Oeste,8,0,25,25
-51,Mato Grosso,1,Centro-Oeste,8,0,13,13
-52,Goiás,2,Centro-Oeste,17,0,12,12
-53,Distrito Federal,5,Centro-Oeste,8,0,63,63
+"CD_GEOCODU","Estado","N_mulheres","regiao","Total_deputados_eleitos","fracao","porcentagem_eleitas"
+11,"Rondônia",3,"Norte",8,0.375,38
+12,"Acre",4,"Norte",8,0.5,50
+13,"Amazonas",0,"Norte",8,0,0
+14,"Roraima",2,"Norte",8,0.25,25
+15,"Pará",1,"Norte",17,0.0588235294117647,6
+16,"Amapá",3,"Norte",8,0.375,38
+17,"Tocantins",2,"Norte",8,0.25,25
+21,"Maranhão",0,"Nordeste",18,0,0
+22,"Piauí",4,"Nordeste",10,0.4,40
+23,"Ceará",1,"Nordeste",22,0.0454545454545455,5
+24,"Rio Grande do Norte",1,"Nordeste",8,0.125,13
+25,"Paraíba",1,"Nordeste",12,0.0833333333333333,8
+26,"Pernambuco",1,"Nordeste",25,0.04,4
+27,"Alagoas",1,"Nordeste",9,0.111111111111111,11
+28,"Sergipe",0,"Nordeste",8,0,0
+29,"Bahia",3,"Nordeste",39,0.0769230769230769,8
+31,"Minas Gerais",4,"Sudeste",53,0.0754716981132075,8
+32,"Espírito Santo",3,"Sudeste",10,0.3,30
+33,"Rio de Janeiro",10,"Sudeste",46,0.217391304347826,22
+35,"São Paulo",11,"Sudeste",70,0.157142857142857,16
+41,"Paraná",5,"Sul",30,0.166666666666667,17
+42,"Santa Catarina",4,"Sul",16,0.25,25
+43,"Rio Grande do Sul",3,"Sul",31,0.0967741935483871,10
+50,"Mato Grosso do Sul",2,"Centro-Oeste",8,0.25,25
+51,"Mato Grosso",1,"Centro-Oeste",8,0.125,13
+52,"Goiás",2,"Centro-Oeste",17,0.117647058823529,12
+53,"Distrito Federal",5,"Centro-Oeste",8,0.625,63
