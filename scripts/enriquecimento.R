@@ -7,7 +7,8 @@ pacman::p_load(dplyr, tidyverse, readxl, geobr)
 estados_br_by_geobr <- read_state(code_state = "all", year=2018)
 
 # Carrega a base eleitas_por_estado
-eleitas_por_estado <- read_excel("bases_tratadas/eleitas_por_estado_2018.xlsx", sheet = 1)
+eleitas_por_estado <- read.csv2("https://raw.githubusercontent.com/lucianacluz/projeto_integracao_github/main/bases_tratadas/eleitas_por_estado_2018.csv",sep = "," )
+
 
 
 # Junta os dados das duas fontes acima a partir das colunas ["code_state" e "CD_GEOCODU"] existentes em cada uma
