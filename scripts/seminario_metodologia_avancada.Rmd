@@ -1,0 +1,773 @@
+---
+title: "Seminario de Metodologia de Pesquisa Avancada"
+author: "Ana Karollina, Geane Raulino e Luciana Luz"
+date: "11/22/2022"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# checando e instalando 
+if(require(pacman) == F) install.packages('pacman'); require(pacman)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# carregar as bibliotecas
+pacman::p_load(dplyr, ggplot2, DataExplorer,funModeling, stringr, caret, mboost, randomForest,  mltools, rattle, party)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Carrega a base da dados direto do site da PCR
+# sinistrosRecife2021Raw <- read.csv2('http://dados.recife.pe.gov.br/dataset/44087d2d-73b5-4ab3-9bd8-78da7436eed1/resource/2caa8f41-ccd9-4ea5-906d-f66017d6e107/download/acidentes_2021-jan.csv', sep = ';', encoding = 'UTF-8')
+
+# carrega as mesmas bases de sinistros de transito direto do meu github
+sinistrosRecifeRaw <- read.csv2('https://raw.githubusercontent.com/lucianacluz/projeto_integracao_github/main/bases_originais/acidentes_2021.csv', sep = ';', encoding = 'UTF-8')
+
+```
+
+### Análise Exploratória
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Entendendo o banco de dados (total de linhas e colunas, etc.)
+introduce(sinistrosRecifeRaw)
+```
+
+#### Visualizando os tipos de colunas do banco de dados 
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+plot_intro(sinistrosRecifeRaw)
+```
+
+#### Visulizando a distribuição de valores ausentes
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+plot_missing(sinistrosRecifeRaw)
+```
+
+#### Visulizando a distribuição do preenchimento das principais colunas
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+plot_bar(sinistrosRecifeRaw)
+```
+
+#### Visulizando os tipos e formatos de valores das colunas
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+str(sinistrosRecifeRaw)
+```
+
+### Tratamento de dados 
+
+#### Colocando as colunas em minúsculo
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+names(sinistrosRecifeRaw) <- tolower(names(sinistrosRecifeRaw))
+```
+
+
+####  Modifcando a data para formato date e extraindo ano, mês e dia para analises futuras
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+sinistrosRecifeRaw$data <- as.Date(sinistrosRecifeRaw$data, format = "%Y-%m-%d")
+sinistrosRecifeRaw$ano <- as.integer(format(sinistrosRecifeRaw$data, "%Y"))
+sinistrosRecifeRaw$mes <- as.integer(format(sinistrosRecifeRaw$data, "%m"))
+sinistrosRecifeRaw$dia <- as.integer(format(sinistrosRecifeRaw$data, "%d"))
+
+
+```
+
+
+#### Extraindo o intervalo do dia a partir do campo hora
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+
+#variaveis auxiliares para tratamento do campo hora
+time_06 <- as.POSIXct("06:00", format = "%H:%M")
+time_12 <- as.POSIXct("12:00", format = "%H:%M")
+time_18 <- as.POSIXct("18:00", format = "%H:%M")
+time_2359 <- as.POSIXct("23:59", format = "%H")
+time_00 <- as.POSIXct("00:00", format = "%H:%M")
+
+sinistrosRecifeRaw <- sinistrosRecifeRaw %>% 
+  mutate(intervalo_dia = case_when(
+    as.POSIXct(hora, format = "%H:%M") >= time_06  & as.POSIXct(hora, format = "%H:%M") < time_12 ~ "MANHA",
+    as.POSIXct(hora, format = "%H:%M") >= time_12  & as.POSIXct(hora, format = "%H:%M") < time_18 ~ "TARDE",
+    as.POSIXct(hora, format = "%H:%M") >= time_18  & as.POSIXct(hora, format = "%H") <= time_2359 ~ "NOITE",
+    as.POSIXct(hora, format = "%H:%M") >= time_00  & as.POSIXct(hora, format = "%H:%M") < time_06 ~ "MADRUGADA",
+    TRUE ~ "NAO INFORMADO"
+  )
+)
+
+```
+
+#### Extraindo o dia da semana a partir do campo data
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+
+sinistrosRecifeRaw$dia_semana <- weekdays(as.Date(sinistrosRecifeRaw$data))
+```
+
+#### Criando uma coluna a partir de varias usando a função coalesce
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+
+sinistrosRecifeRaw <- sinistrosRecifeRaw %>% 
+  mutate(automoveis = coalesce(auto, onibus, caminhao, viatura, ciclom)) %>%
+  mutate(divisao_da_via = coalesce(divisao_via1, divisao_via2, divisao_via3)) %>%
+  mutate(outros_envolvidos = coalesce(outros, ciclista, pedestre) 
+)
+
+```
+
+#### Remove as colunas que já foram unificadas e não serão necessarias mais pra frente
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+
+sinistrosRecifeRaw <-  sinistrosRecifeRaw %>% 
+  select( -c("auto", "onibus", "caminhao", "viatura", "ciclom","divisao_via1","divisao_via2","divisao_via3", "outros", "ciclista", "pedestre"))
+
+```
+
+#### Transforma todos os valores em "maiusculas"
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+
+sinistrosRecifeRaw$natureza_acidente <- toupper(sinistrosRecifeRaw$natureza_acidente)
+sinistrosRecifeRaw$situacao <- toupper(sinistrosRecifeRaw$situacao)
+sinistrosRecifeRaw$bairro <- toupper(sinistrosRecifeRaw$bairro)
+sinistrosRecifeRaw$sentido_via <- toupper(sinistrosRecifeRaw$sentido_via)
+sinistrosRecifeRaw$tipo <- toupper(sinistrosRecifeRaw$tipo)
+sinistrosRecifeRaw$intervalo_dia <- toupper(sinistrosRecifeRaw$intervalo_dia)
+sinistrosRecifeRaw$dia_semana <- toupper(sinistrosRecifeRaw$dia_semana)
+sinistrosRecifeRaw$acidente_verificado <- toupper(sinistrosRecifeRaw$acidente_verificado)
+sinistrosRecifeRaw$tempo_clima <- toupper(sinistrosRecifeRaw$tempo_clima)
+sinistrosRecifeRaw$situacao_semaforo <- toupper(sinistrosRecifeRaw$situacao_semaforo)
+sinistrosRecifeRaw$sinalizacao <- toupper(sinistrosRecifeRaw$sinalizacao)
+sinistrosRecifeRaw$condicao_via <- toupper(sinistrosRecifeRaw$condicao_via)
+sinistrosRecifeRaw$conservacao_via <- toupper(sinistrosRecifeRaw$conservacao_via)
+sinistrosRecifeRaw$ponto_controle <- toupper(sinistrosRecifeRaw$ponto_controle)
+sinistrosRecifeRaw$situacao_placa <- toupper(sinistrosRecifeRaw$situacao_placa)
+sinistrosRecifeRaw$velocidade_max_via <- toupper(sinistrosRecifeRaw$velocidade_max_via)
+sinistrosRecifeRaw$mao_direcao <- toupper(sinistrosRecifeRaw$mao_direcao)
+sinistrosRecifeRaw$divisao_da_via <- toupper(sinistrosRecifeRaw$divisao_da_via)
+
+```
+
+#### Criando a coluna de rotulo (o "y" usado nos modelos)
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+
+sinistrosRecifeFinal <- sinistrosRecifeRaw %>% 
+  mutate(acidente_com_vitima = case_when(
+    natureza_acidente == 'COM VÍTIMA' ~ 1,
+    natureza_acidente == 'VÍTIMA FATAL' ~ 1,
+    TRUE ~ 0
+  )
+)
+sinistrosRecifeFinal$acidente_com_vitima <- as.integer(sinistrosRecifeFinal$acidente_com_vitima)
+
+```
+
+#### Movendo o rotulo("y") para a primeira posicao do dataset
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+sinistrosRecifeFinal <- sinistrosRecifeFinal %>% select(acidente_com_vitima, everything())
+```
+
+#### Preenchendo valores faltantes checando se o tamanho do conteudo preenchido é menor que 1
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+sinistrosRecifeFinal$bairro[str_length(sinistrosRecifeFinal$bairro) < 1  ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$sentido_via[str_length(sinistrosRecifeFinal$sentido_via) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$tipo[str_length(sinistrosRecifeFinal$tipo) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$intervalo_dia[str_length(sinistrosRecifeFinal$intervalo_dia) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$dia_semana[str_length(sinistrosRecifeFinal$dia_semana) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$tempo_clima[str_length(sinistrosRecifeFinal$tempo_clima) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$situacao_semaforo[str_length(sinistrosRecifeFinal$situacao_semaforo) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$situacao_placa[str_length(sinistrosRecifeFinal$situacao_placa) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$velocidade_max_via[str_length(sinistrosRecifeFinal$velocidade_max_via) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$divisao_da_via[str_length(sinistrosRecifeFinal$divisao_da_via) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$situacao[str_length(sinistrosRecifeFinal$situacao) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$natureza_acidente[str_length(sinistrosRecifeFinal$natureza_acidente) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$acidente_verificado[str_length(sinistrosRecifeFinal$acidente_verificado) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$sinalizacao[str_length(sinistrosRecifeFinal$sinalizacao) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$conservacao_via[str_length(sinistrosRecifeFinal$conservacao_via) < 1  ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$condicao_via[str_length(sinistrosRecifeFinal$condicao_via) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$ponto_controle[str_length(sinistrosRecifeFinal$ponto_controle) < 1 ] <- "NAO INFORMADO" 
+sinistrosRecifeFinal$mao_direcao[str_length(sinistrosRecifeFinal$mao_direcao) < 1 ] <- "NAO INFORMADO" 
+
+```
+
+#### Observando quantitativamente os dados
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+status(sinistrosRecifeFinal)
+```
+
+### Construindo gráficos
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+# Qual a distribuição de ocorrências ao longo dos meses de 2021?
+ocorrencias_mes <-
+  sinistrosRecifeFinal %>%
+  group_by(mes) %>%
+  count(mes, sort = T, name = 'total')
+
+ocorrencias_mes %>% 
+ggplot( aes(x = mes, y = total, fill = mes)) +
+  geom_bar(stat = "identity", fill = "#477ed6" , alpha=.9, width=.8) +
+  ggtitle("Número de acidentes ocorridos nos meses de 2021 ") +
+  xlab("mês") +
+  ylab("total") +
+  scale_x_continuous(breaks = scales::breaks_width(1)) +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5), #hjust centraliza o título
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+# Qual a distribuição da situacao das ocorrências?
+ocorrencias_situacao <-
+  sinistrosRecifeFinal %>%
+  group_by(situacao) %>%
+  count(situacao, sort = T, name = 'total')
+
+ocorrencias_situacao %>% 
+ggplot( aes(x = situacao, y = total, fill = situacao)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Situações dos registros de ocorrências") +
+  xlab("situação") +
+  ylab("total") +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5), #hjust centraliza o título
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+#Qual a natureza do acidente: com vitima, sem vitima, vitima fatal e outros (distribuição)?
+distribuicao_natureza_acidente <-
+  sinistrosRecifeFinal %>%
+  group_by(natureza_acidente) %>%
+  count(natureza_acidente, sort = TRUE, name = 'total')
+
+distribuicao_natureza_acidente %>%
+ggplot( aes(x =reorder(total,natureza_acidente), y = total, fill = natureza_acidente)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Natureza dos acidentes") +
+  xlab("natureza") +
+  ylab("total") +
+  coord_flip() + 
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5),
+    axis.text.y = element_blank(),
+     axis.ticks = element_blank(),
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+#### observando quantitativamente os dados
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+
+acidentes_dia_semana <-
+  sinistrosRecifeFinal %>%
+  group_by(dia_semana) %>%
+  count(dia_semana, name = 'total')
+
+# acidentes_dia_semana$dia_semana <- factor(
+#   acidentes_dia_semana$dia_semana,
+#   levels = c("DOMINGO", "SEGUNDA FEIRA", "TERÇA FEIRA", "QUARTA FEIRA", "QUINTA FEIRA", "SEXTA FEIRA", "SÁBADO")
+# )
+
+acidentes_dia_semana %>%
+ggplot( aes(x = dia_semana, y = total, fill = dia_semana)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Acidentes por dia da semana") +
+  xlab("dia da semana") +
+  ylab("total") +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5), #hjust centraliza o título
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+
+```
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+
+acidentes_interv_dia <-
+  sinistrosRecifeFinal %>%
+  group_by(intervalo_dia) %>%
+  count(intervalo_dia, sort = T, name = 'total')
+
+acidentes_interv_dia$intervalo_dia <- factor(
+  acidentes_interv_dia$intervalo_dia,
+  levels = c("MADRUGADA", "MANHA", "TARDE", "NOITE")
+)
+
+acidentes_interv_dia %>% 
+ggplot( aes(x = intervalo_dia, y = total, fill = intervalo_dia)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Acidentes por intervalo do dia") +
+  xlab("intervalo do dia") +
+  ylab("total") +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5), #hjust centraliza o título
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+condicao_tempo_clima <-
+  sinistrosRecifeFinal %>%
+  group_by(tempo_clima) %>%
+  count(tempo_clima, name = 'total')
+
+condicao_tempo_clima$tempo_clima <- factor(
+  condicao_tempo_clima$tempo_clima,
+  levels = c("BOM", "CHUVOSO", "NUBLADO", "NAO INFORMADO")
+)
+
+condicao_tempo_clima %>% 
+ggplot( aes(x = tempo_clima, y = total, fill = tempo_clima)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Condições meteorológicas mais frequentes\n no momento dos acidentes") +
+  xlab("condicao clima") +
+  ylab("total") +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5), 
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+acidentes_condicao_via <-
+  sinistrosRecifeFinal %>%
+  group_by(condicao_via) %>%
+  count(condicao_via, sort = T, name = 'total')
+
+acidentes_condicao_via %>% 
+ggplot( aes(x = reorder(total,condicao_via), y = total, fill = condicao_via)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Condições da via no momento dos acidentes") +
+  xlab("condicao via") +
+  ylab("total") +
+  coord_flip() +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5),
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+
+```
+
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+
+direcao_via <-
+  sinistrosRecifeFinal %>%
+  group_by(mao_direcao) %>%
+  count(mao_direcao, sort = T, name = 'total')
+
+direcao_via %>% 
+ggplot( aes(x = mao_direcao, y = total, fill = mao_direcao)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Tipos de via/Mão Direção\n na circunstância do acidente") +
+  xlab("tipo via") +
+  ylab("total") +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5),
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+
+```
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+#limpeza/agrupamento/substituições de valores para correções dos textos
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "ATROPELAMENTO ANIMAL", "ATROPELAMENTO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "ATROPELAMENTO DE ANIMAL", "ATROPELAMENTO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "APOIO COMPESA", "OUTROS")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "OUTROS APOIOS", "OUTROS")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "COLISÃO TRASEIRA", "COLISAO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "COLISÃO FRONTAL", "COLISAO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "COLISÃO LATERAL", "COLISAO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "COLISÃO TRANSVERSAL", "COLISAO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "COLISAO COM CICLISTA", "COLISAO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "COLISÃO", "COLISAO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "CHOQUE VEÍCULO PARADO", "CHOQUE")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "CHOQUE OBJETO FIXO", "CHOQUE")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "ABALROAMENTO LONGITUDINAL", "ABALROAMENTO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "ABALROAMENTO TRANSVERSAL", "ABALROAMENTO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "ATROPELAMENTO DE PESSOA", "ATROPELAMENTO")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "ALAGAMENTO", "OUTROS")
+sinistrosRecifeFinal$tipo <- str_replace(sinistrosRecifeFinal$tipo, "MONITORAMENTO", "OUTROS")
+
+tipos_acidentes <- sinistrosRecifeFinal %>%
+  group_by(tipo) %>%
+  count(tipo, name = 'total') %>%
+  arrange(desc(total)) 
+
+tipos_acidentes %>% 
+  ggplot() + 
+  geom_bar(mapping = aes(x = reorder(tipo, total), y= total, fill= tipo), stat = "identity") +
+  ggtitle("Tipos de acidentes") +
+  xlab("tipo") +
+  ylab("total") +
+  coord_flip() +
+  theme(
+    plot.title = element_text(size=18, face="bold", hjust = 0.5),
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+estado_vias <- sinistrosRecifeFinal %>%
+  group_by(conservacao_via) %>%
+  count(conservacao_via, sort = TRUE, name = 'total') %>%
+  arrange(desc(total)) 
+
+estado_vias %>% 
+ggplot( aes(x = reorder(conservacao_via, total), y = total, fill = conservacao_via)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Conservacao da via") +
+  xlab("conservacao da via") +
+  ylab("total") +
+  coord_flip() +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5),
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+bairro_acidente <- sinistrosRecifeFinal %>%
+  group_by(bairro) %>%
+  count(bairro, name = 'total') %>%
+  arrange(desc(total)) 
+#pegando apenas os 15 primeiros do dataset para montagem do grafico
+bairro_acidente %>% head(15)  %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = reorder(bairro, total), y= total, fill= bairro), stat = "identity") +
+  ggtitle("Distribuição de acidentes por bairro - Top(15)") +
+  xlab("bairro") +
+  ylab("total") +
+  coord_flip() +
+  scale_y_continuous(breaks = scales::breaks_width(30)) +
+  theme(
+    plot.title = element_text(size=18, face="bold", hjust = 0.5), #hjust centraliza o título
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+
+```
+
+#### observando quantitativamente os dados
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+numero_acidentes_com_vitimas_por_bairro <- sinistrosRecifeFinal %>%
+  group_by(bairro, tipo) %>%
+  filter(natureza_acidente == 'COM VÍTIMA' | natureza_acidente == 'VÍTIMA FATAL' ) %>%
+  count(bairro, sort = T, name = 'total') %>% 
+  group_by(bairro) %>% 
+  summarise(total_acidentes_com_vitimas_por_bairro = sum(total)) %>% 
+  arrange(desc(total_acidentes_com_vitimas_por_bairro))
+
+#montando o grafico
+acidentes_com_vitimas_por_bairro <-  numero_acidentes_com_vitimas_por_bairro
+names(acidentes_com_vitimas_por_bairro)[2] = "total"
+
+#pegando apenas os 15 primeiros do dataset para montagem do grafico  
+acidentes_com_vitimas_por_bairro %>% head(15)  %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = reorder(bairro, total), y= total, fill= bairro), stat = "identity") +
+  ggtitle("Distribuição de acidentes com vítimas por bairro  - Top(15)") +
+  xlab("bairro") +
+  ylab("total") +
+  coord_flip() +
+  theme(
+    plot.title = element_text(size=18, face="bold", hjust = 0.5),
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+#limpeza/agrupamento/substituições de valores para correções dos textos
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "A-33A", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-1", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-3", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-15", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-18", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-26", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-28", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-30", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-31", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-32", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-33", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-34", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-4A", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-4B", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-5A", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-5B", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-6B", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-6C", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-8A", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-24A", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-24B", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-25A", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-25B", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-25C", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "R-25D", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "OUTRAS0", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "OUTRAS2", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "OUTRAS9", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "OUTRAS5", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, "OUTRAS8", "OUTRAS")
+sinistrosRecifeFinal$situacao_placa <- str_replace(str_replace(sinistrosRecifeFinal$situacao_placa, '"', ''), '"', '')
+sinistrosRecifeFinal$situacao_placa <- str_replace(str_replace(sinistrosRecifeFinal$situacao_placa, '"', ''), '"', '')
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, 'PLACAS DÊ A PREFERÊNCIA', 'OUTRAS')
+sinistrosRecifeFinal$situacao_placa <- str_replace(sinistrosRecifeFinal$situacao_placa, 'DÊ A PREFERÊNCIA', 'OUTRAS')
+
+situacao_placa_amostra <-
+  sinistrosRecifeFinal %>%
+  group_by(situacao_placa) %>%
+  count(situacao_placa, sort = T, name = 'total')
+
+situacao_placa_amostra %>% 
+ggplot( aes(x = reorder(situacao_placa,total), y = total, fill = situacao_placa)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Distribuição da situacao das placas próximas `as ocorrências") +
+  xlab("situacao placa") +
+  ylab("total") +
+  coord_flip() + 
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5),
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+#limpeza/agrupamento/substituições de valores para correções dos textos
+sinistrosRecifeFinal$velocidade_max_via[str_length(sinistrosRecifeFinal$velocidade_max_via) <1  ] <- "NAO INFORMADO"
+sinistrosRecifeFinal$velocidade_max_via <- toupper(sinistrosRecifeFinal$velocidade_max_via)
+
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "N/I", "NAO INFORMADO")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "70 KM/H", "60KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "60KM/H", "60KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "60KM", "60KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "60 KM/H", "60KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "50 KM/H", "50KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "40KM/H", "40KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "40KM", "40KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "40 KM/H", "40KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "30KM/H", "30KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "30 KM/H", "30KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "30KM", "30KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "30 E 40 KM/H", "30KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "20KM", "20KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "20 KM/H", "20KM")
+sinistrosRecifeFinal$velocidade_max_via <- str_replace(sinistrosRecifeFinal$velocidade_max_via, "10 KM/H", "20KM")
+
+velocidade_max_via_amostra <-
+  sinistrosRecifeFinal %>%
+  group_by(velocidade_max_via) %>%
+  count(velocidade_max_via, sort = T, name = 'total')
+
+velocidade_max_via_amostra %>% 
+ggplot( aes(x = velocidade_max_via, y = total, fill = velocidade_max_via)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Distribuição da velocidade permitida na via da ocorrência") +
+  xlab("velocidade_max_via") +
+  ylab("total") +
+  coord_flip() +
+  theme(
+    plot.title = element_text(size=14, face="bold", hjust = 0.5),
+    axis.title.x = element_text(size=10),
+    axis.title.y = element_text(size=10)
+  )
+```
+
+### Enriquecimento de dados
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+# Junta os dados das duas fontes acima a partir das colunas ["bairro"] existente em cada fonte
+sinistrosRecifeFinal <- left_join(sinistrosRecifeFinal, numero_acidentes_com_vitimas_por_bairro, by = c("bairro" = "bairro")) 
+
+#Se algum bairro não apresentar o total de acidentes c/vitimas será preenchido com ZERO (0) para evitar a existencia de NA value
+sinistrosRecifeFinal$total_acidentes_com_vitimas_por_bairro <-
+  replace(
+    sinistrosRecifeFinal$total_acidentes_com_vitimas_por_bairro,
+    is.na(sinistrosRecifeFinal$total_acidentes_com_vitimas_por_bairro),
+    0
+  )
+```
+
+#### Removendo da memoria alguns objetos que não serão mais utilizados
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+rm( sinistrosRecifeRaw,
+    acidentes_com_vitimas_por_bairro,
+    acidentes_condicao_via,
+    acidentes_dia_semana,
+    acidentes_interv_dia,
+    bairro_acidente,
+    condicao_tempo_clima,
+    direcao_via,
+    distribuicao_natureza_acidente,
+    estado_vias,
+    numero_acidentes_com_vitimas_por_bairro,
+    ocorrencias_mes,
+    ocorrencias_situacao,
+    situacao_placa_amostra,
+    tipos_acidentes,
+    velocidade_max_via_amostra
+    )
+
+```
+
+#### Filtrando apenas os registros cujo status é finalizado que é o que interessa para treinar os modelos
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+sinistrosRecifeFinal <- sinistrosRecifeFinal %>%  filter(situacao == 'FINALIZADA') 
+ncol(sinistrosRecifeFinal)
+nrow(sinistrosRecifeFinal)
+
+```
+
+#### Removendo colunas após a realização da permuta de variáveis
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+sinistrosRecifeFinal <-  sinistrosRecifeFinal %>% 
+  select( -c("data","hora","ano", "mes", "dia","vitimas", "vitimasfatais", "bairro", "endereco", "numero", "detalhe_endereco_acidente", "complemento", "natureza_acidente", "sentido_via", "num_semaforo", "situacao", "bairro_cruzamento"))
+```
+
+
+#### Conferindo a remoção das colunas
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+status(sinistrosRecifeFinal)
+```
+
+### Convertendo em valores binários
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+#definindo uma semente
+set.seed(1401)
+
+sinistrosRecifeDummy <- dummyVars(" ~ .", data=sinistrosRecifeFinal)
+sinistrosRecifeBinarizado <- data.frame(predict(sinistrosRecifeDummy, newdata=sinistrosRecifeFinal))
+```
+
+
+### Treino e Teste: Pré-processamento
+
+#### Particionando os dados
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+#converte a coluna usada como "y" em factor
+sinistrosRecifeBinarizado$acidente_com_vitima = as.factor(sinistrosRecifeBinarizado$acidente_com_vitima)
+# cria a partição 70-30
+particao_sinistros = caret::createDataPartition(sinistrosRecifeBinarizado$acidente_com_vitima, p=.7, list = F)
+# treino
+treino_sinistros = sinistrosRecifeBinarizado[particao_sinistros, ]
+# - treino = teste
+teste_sinistros = sinistrosRecifeBinarizado[-particao_sinistros, ]
+```
+
+#### Criando o controle para validação cruzada
+
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+train.control <- trainControl(method = "cv", number = 10, verboseIter = T)
+```
+
+#### Treinando os modelos
+
+##### Regressão Linear
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+#sinistros_LM <- train(acidente_com_vitima ~ ., data = treino_sinistros, method = "lm", trControl = train.control)
+#summary(sinistros_LM) # sumário do modelo linear
+#var_importance <- varImp(sinistros_LM, scale = FALSE)
+#plot(var_importance, top = 20) # importância das variáveis
+
+```
+
+
+##### Bagging com Floresta Aleatória
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sinistros_RF <- train(acidente_com_vitima ~ ., data = treino_sinistros, method = "cforest", trControl = train.control )
+plot(sinistros_RF) # evolução do modelo
+
+var_importance <- varImp(sinistros_RF, scale = T) # importância de cada variável
+plot(var_importance, top = 20) # plot de importância
+
+```
+
+##### Árvore de Decisão
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+sinistros_RPART <- train(acidente_com_vitima ~ ., data = treino_sinistros, method = "rpart", trControl = train.control)
+#summary(sinistros_RPART)
+fancyRpartPlot(sinistros_RPART$finalModel) # desenho da árvore
+var_importance <- varImp(sinistros_RPART)
+plot(var_importance, top = 20) # importância das variáveis
+
+```
+
+##### Boosting com Boosted Generalized Linear Model
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+sinistros_ADA <- train(acidente_com_vitima ~ ., data = treino_sinistros, method = "glmboost", trControl = train.control)
+#summary(sinistros_ADA) # sumário
+plot(sinistros_ADA) # evolução do modelo
+var_importance <- varImp(sinistros_ADA)
+plot(var_importance, top = 20) # importância das variáveis
+
+```
+
+##### KNN
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+sinistros_KNN <- train(acidente_com_vitima ~ ., data = treino_sinistros, method = "knn", trControl = train.control)
+plot(sinistros_KNN)
+var_importance <- varImp(sinistros_KNN)
+plot(var_importance, top = 20) # importância das variáveis
+
+```
+
+##### Selecionando o melhor modelo
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+melhor_modelo <- resamples(list(
+  #LM = sinistros_LM, 
+  KNN = sinistros_KNN, 
+  RPART = sinistros_RPART, 
+  RF = sinistros_RF,   
+  ADABOOST = sinistros_ADA
+))
+
+summary(melhor_modelo)
+```
+
+##### Executando um predict de test com todos os modelos
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+predVals <- extractPrediction(list(sinistros_RPART, sinistros_RF, sinistros_ADA, sinistros_KNN), testX = teste_sinistros[, -1], testY = teste_sinistros$acidente_com_vitima) 
+plotObsVsPred(predVals)
+
+```
+
+#### Executando um predict de test com o melhor modelo (Floresta Aleatória) analisado pela média da acurácia
+```{r echo=FALSE, fig.width=10, message=FALSE, warning=FALSE}
+predVals <- extractPrediction(list(sinistros_RF), testX = teste_sinistros[, -1], testY = teste_sinistros$acidente_com_vitima) 
+plotObsVsPred(predVals)
+```
+
+#### Criando a matriz de confusão e visualizando a acuidade do melhor modelo (Floresta Aleatória)  
+```{r echo=TRUE, fig.width=10, message=FALSE, warning=FALSE}
+# cria predição
+predicao_sinistros_RF <- predict(sinistros_RF, teste_sinistros) 
+cm_sinistros_RF <- confusionMatrix(predicao_sinistros_RF, teste_sinistros$acidente_com_vitima)
+cm_sinistros_RF
+cm_sinistros_RF$table
+
+# Expected Accuracy (AccE) = Acuidade Esperada = estimativa de acuidade "esperada", ou seja, 
+#uma acuidade mínima que poderia ser conseguida simplesmente "chutando" a classe de forma aleatória. 
+gtBaixa <- cm_sinistros_RF$table[1]+cm_sinistros_RF$table[2]
+gtAlta <- cm_sinistros_RF$table[3]+cm_sinistros_RF$table[4]
+pdBaixa <- cm_sinistros_RF$table[1]+cm_sinistros_RF$table[2]
+pdAlta <- cm_sinistros_RF$table[3]+cm_sinistros_RF$table[4]
+gtTotal <- gtAlta + gtBaixa
+estAcc <- (gtBaixa*pdBaixa/gtTotal^2)+(gtAlta*pdAlta/gtTotal^2)
+#acuidade
+estAcc
+
+```
