@@ -1,5 +1,5 @@
 ---
-title: "Seminario de Metodologia de Pesquisa Avancada"
+title: "Seminário de Metodologia de Pesquisa Avancada"
 author: "Ana Karollina, Geane Raulino e Luciana Luz"
 date: "11/22/2022"
 output: html_document
@@ -771,3 +771,5 @@ estAcc <- (gtBaixa*pdBaixa/gtTotal^2)+(gtAlta*pdAlta/gtTotal^2)
 estAcc
 
 ```
+
+
